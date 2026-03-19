@@ -1,0 +1,100 @@
+@startuml Scenario4_Delete_CoworkingSpace
+
+' ========================================================
+'  Scenario 4 : Delete Coworking Space (Cascade Delete)
+'  Project : be-project-68-cucode
+'  Date    : March 2026
+' ========================================================
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 11
+
+skinparam sequence {
+    ArrowColor #37474F
+    ArrowFontSize 10
+    ArrowFontColor #546E7A
+    LifeLineBorderColor #78909C
+    LifeLineBackgroundColor #ECEFF1
+    ParticipantBorderColor #37474F
+    ParticipantBackgroundColor #E3F2FD
+    ParticipantFontColor #0D47A1
+    ParticipantFontStyle bold
+    ParticipantFontSize 12
+    ActorBorderColor #37474F
+    ActorFontStyle bold
+    GroupBorderColor #90A4AE
+    GroupHeaderFontSize 12
+    DividerBorderColor #B0BEC5
+    DividerFontSize 13
+    DividerFontStyle bold
+    BoxBorderColor #CFD8DC
+    BoxBackgroundColor #FAFAFA
+    BoxFontSize 12
+}
+
+skinparam note {
+    BackgroundColor #FFFDE7
+    BorderColor #F9A825
+    FontSize 9
+}
+
+title **Scenario 4 : Delete Coworking Space (Cascade)**
+
+' ───────── Participants ─────────
+actor "Client\n(Postman / Frontend)" as Client
+box "Express Server" #F5F5F5
+    participant "Router\n& Middleware" as Router
+    participant "Auth\nMiddleware" as AuthMW
+    participant "Controller" as Ctrl
+end box
+database "MongoDB\n(Atlas)" as DB
+
+' ───────── Flow ─────────
+Client -> Router : DELETE /api/v1/coworkingspaces/:id\nHeader: Authorization: Bearer <token>
+activate Router
+
+Router -> AuthMW : protect → authorize('admin')
+activate AuthMW
+AuthMW -> DB : verify token → find user
+activate DB
+DB --> AuthMW : admin user
+deactivate DB
+AuthMW -> Router : next()
+deactivate AuthMW
+
+Router -> Ctrl : deleteCoworkingSpace(req, res)
+activate Ctrl
+
+Ctrl -> DB : CoworkingSpace.findById(id)
+activate DB
+DB --> Ctrl : coworking space document
+deactivate DB
+
+alt Not found
+    Ctrl --> Router : res.status(404)
+    Router --> Client : **404 Not Found**
+else Found
+    Ctrl -> DB : coworkingspace.deleteOne()
+    activate DB
+
+    note right of DB
+      pre-deleteOne middleware:
+      Booking.deleteMany({
+        coworkingspace: this._id
+      })
+    end note
+
+    DB -> DB : Cascade delete\nall related bookings
+    DB --> Ctrl : deleted
+    deactivate DB
+
+    Ctrl --> Router : res.status(200)\n{success: true, data: {}}
+    Router --> Client : **200 OK**\n{success: true, data: {}}
+end
+
+deactivate Ctrl
+deactivate Router
+
+@enduml

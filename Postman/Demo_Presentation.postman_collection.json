@@ -1,0 +1,1022 @@
+{
+  "info": {
+    "_postman_id": "demo-68-cucode-presentation",
+    "name": "Demo Presentation — Co-working Space API",
+    "description": "🎬 Demo Presentation Test Suite — ชุดทดสอบสำหรับการนำเสนอ\n\nCollection นี้ออกแบบมาเพื่อใช้รันตามลำดับขั้นตอนการนำเสนอ (Demo) ระบบ Co-working Space Reservation API โดยจำลองสถานการณ์การใช้งานจริงตั้งแต่ต้นจนจบ\n\n📋 ลำดับการนำเสนอ (12 ขั้นตอน)\n\n1️⃣ User Registration + Validation Check\n   - User ทั่วไปลงทะเบียนเข้าระบบ\n   - ทดสอบ validation: ลงทะเบียนซ้ำด้วย email เดิมต้อง fail\n\n2️⃣ User Log-in\n   - User ทั่วไป login เข้าสู่ระบบด้วย email/password\n   - ได้รับ JWT token สำหรับใช้งาน\n\n3️⃣ User View Product (Co-working Spaces)\n   - ดูรายการ Co-working Space ทั้งหมด\n   - ดูรายละเอียด Co-working Space เฉพาะตัว\n\n4️⃣ User Create Booking + Check Condition\n   - สร้าง Booking ครั้งที่ 1, 2, 3 (สำเร็จ)\n   - สร้าง Booking ครั้งที่ 4 ต้อง fail (เกินลิมิต 3 ครั้ง)\n\n5️⃣ User View Own Booking\n   - ดู Booking ที่สร้างไว้ (User เห็นเฉพาะของตัวเอง)\n\n6️⃣ User Edit Own Booking\n   - แก้ไขวันที่จอง (bookingDate) ของ Booking ตัวเอง\n\n7️⃣ User Delete Own Booking\n   - ลบ Booking ของตัวเอง\n\n8️⃣ User Log-out\n   - ออกจากระบบ (ล้าง JWT cookie)\n\n9️⃣ Admin Log-in\n   - Admin login เข้าสู่ระบบ\n\n🔟 Admin View Any Booking\n   - Admin ดู Booking ทั้งหมดของทุก user\n\n1️⃣1️⃣ Admin Edit Any Booking\n   - Admin แก้ไข Booking ของ user คนอื่น\n\n1️⃣2️⃣ Admin Delete Any Booking\n   - Admin ลบ Booking ของ user คนอื่น + Cleanup\n\n📊 สรุป\n- ใช้ Environment: Coworking Space Env (URL = http://localhost:5000/api/v1)\n- Admin จะถูกสร้างใหม่อัตโนมัติ (register + login)\n- ต้องมี CoworkingSpace อย่างน้อย 1 ตัวในฐานข้อมูล",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. User Registration + Validation Check",
+      "description": "📝 ขั้นตอนที่ 1 — ลงทะเบียน User ใหม่\n\nจุดประสงค์: ทดสอบว่าระบบ Register ทำงานถูกต้อง ทั้ง happy path และ error case\n\nรายละเอียด:\n- สร้าง user ใหม่ด้วย name, tel, email, password, role\n- ตรวจว่าได้ 201 Created + JWT token กลับมา\n- ทดสอบ validation: ลงทะเบียนซ้ำด้วย email เดิมต้องได้ 400 Bad Request (เพราะ email ต้อง unique)",
+      "item": [
+        {
+          "name": "1.1 Register User — Success",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// สร้าง email ที่ไม่ซ้ำกันทุกครั้งที่รัน",
+                  "var ts = Date.now();",
+                  "pm.environment.set('DEMO_EMAIL', 'demo_user_' + ts + '@example.com');",
+                  "pm.environment.set('DEMO_NAME', 'DemoUser' + ts);",
+                  "pm.environment.set('DEMO_PASSWORD', 'password123');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 1.1 Register — Status 201 Created', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('✅ 1.1 Register — success true + token exists', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    pm.expect(json.token.length).to.be.greaterThan(0);",
+                  "    pm.environment.set('USER_TOKEN', json.token);",
+                  "});",
+                  "",
+                  "pm.test('✅ 1.1 Register — Content-Type is JSON', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "});",
+                  "",
+                  "pm.test('⚡ 1.1 Register — Response time < 2000ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{DEMO_NAME}}\",\n  \"tel\": \"0891234567\",\n  \"email\": \"{{DEMO_EMAIL}}\",\n  \"password\": \"{{DEMO_PASSWORD}}\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/register",
+              "host": ["{{URL}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "1.2 Register Duplicate Email — Should Fail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 1.2 Duplicate Register — Status 400 Bad Request', function () {",
+                  "    pm.expect(pm.response.code).to.eql(400);",
+                  "});",
+                  "",
+                  "pm.test('✅ 1.2 Duplicate Register — success is false', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(false);",
+                  "});",
+                  "",
+                  "pm.test('✅ 1.2 Duplicate Register — No token returned', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{DEMO_NAME}}\",\n  \"tel\": \"0891234567\",\n  \"email\": \"{{DEMO_EMAIL}}\",\n  \"password\": \"{{DEMO_PASSWORD}}\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/register",
+              "host": ["{{URL}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. User Log-in",
+      "description": "🔑 ขั้นตอนที่ 2 — User ทั่วไป Login\n\nจุดประสงค์: ทดสอบว่า user ที่ลงทะเบียนแล้วสามารถ login ได้ และได้รับ JWT token กลับมา\n\nรายละเอียด:\n- ส่ง email + password ที่ลงทะเบียนไว้\n- ตรวจว่าได้ 200 OK + JWT token\n- เก็บ token ไว้ใน USER_TOKEN สำหรับ request ถัดไป",
+      "item": [
+        {
+          "name": "2.1 Login User — Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 2.1 Login — Status 200 OK', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 2.1 Login — success true + token exists', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    pm.environment.set('USER_TOKEN', json.token);",
+                  "});",
+                  "",
+                  "pm.test('⚡ 2.1 Login — Response time < 2000ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{DEMO_EMAIL}}\",\n  \"password\": \"{{DEMO_PASSWORD}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/login",
+              "host": ["{{URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. User View Product",
+      "description": "🏢 ขั้นตอนที่ 3 — ดูรายการ Co-working Space\n\nจุดประสงค์: ทดสอบว่า user สามารถดูรายการ Co-working Space ทั้งหมดได้ (Public endpoint) และดูรายละเอียดเฉพาะตัวได้\n\nรายละเอียด:\n- GET /coworkingspaces — ดูทั้งหมด พร้อมตรวจ pagination และ count\n- GET /coworkingspaces/:id — ดูรายละเอียดเฉพาะตัว พร้อมเก็บ SPACE_ID สำหรับสร้าง booking",
+      "item": [
+        {
+          "name": "3.1 Get All Co-working Spaces",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 3.1 Get All — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 3.1 Get All — success true + data is array', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "    pm.expect(json.count).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('✅ 3.1 Get All — At least 1 space exists', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data.length).to.be.greaterThan(0);",
+                  "    // เก็บ ID ของ space แรกสำหรับ booking",
+                  "    pm.environment.set('SPACE_ID', json.data[0]._id);",
+                  "    pm.environment.set('SPACE_NAME', json.data[0].name);",
+                  "});",
+                  "",
+                  "pm.test('✅ 3.1 Get All — Data has required fields', function () {",
+                  "    var space = pm.response.json().data[0];",
+                  "    pm.expect(space).to.have.property('name');",
+                  "    pm.expect(space).to.have.property('address');",
+                  "    pm.expect(space).to.have.property('tel');",
+                  "    pm.expect(space).to.have.property('open_close_time');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"]
+            }
+          }
+        },
+        {
+          "name": "3.2 Get Single Co-working Space",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 3.2 Get Single — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 3.2 Get Single — success true + data is object', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data).to.be.an('object');",
+                  "    pm.expect(json.data.name).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('✅ 3.2 Get Single — Correct space returned', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data._id).to.eql(pm.environment.get('SPACE_ID'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces/{{SPACE_ID}}",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces", "{{SPACE_ID}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. User Create Booking + Check Condition",
+      "description": "📅 ขั้นตอนที่ 4 — สร้าง Booking + ทดสอบเงื่อนไขจำกัด 3 ครั้ง\n\nจุดประสงค์: ทดสอบว่า User สามารถจองได้สูงสุด 3 ครั้ง ครั้งที่ 4 ต้องถูกปฏิเสธ\n\nรายละเอียด:\n- สร้าง Booking ครั้งที่ 1 (bookingDate: วันพรุ่งนี้) → ต้องสำเร็จ 201\n- สร้าง Booking ครั้งที่ 2 (bookingDate: อีก 2 วัน) → ต้องสำเร็จ 201\n- สร้าง Booking ครั้งที่ 3 (bookingDate: อีก 3 วัน) → ต้องสำเร็จ 201\n- สร้าง Booking ครั้งที่ 4 (bookingDate: อีก 4 วัน) → ต้อง fail 400 (เกิน limit 3)\n\nเงื่อนไขที่ทดสอบ: User ทั่วไปจองได้สูงสุด 3 ครั้ง (existedBookings.length >= 3 → reject)",
+      "item": [
+        {
+          "name": "4.1 Create Booking #1 — Success",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// วันพรุ่งนี้",
+                  "var d = new Date();",
+                  "d.setDate(d.getDate() + 1);",
+                  "pm.environment.set('BOOKING_DATE_1', d.toISOString().split('T')[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 4.1 Booking #1 — Status 201 Created', function () {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "});",
+                  "",
+                  "pm.test('✅ 4.1 Booking #1 — success true + data exists', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data).to.have.property('_id');",
+                  "    pm.expect(json.data).to.have.property('bookingDate');",
+                  "    pm.expect(json.data).to.have.property('user');",
+                  "    pm.expect(json.data).to.have.property('coworkingspace');",
+                  "    pm.environment.set('BOOKING_ID_1', json.data._id);",
+                  "    pm.environment.set('DEMO_USER_ID', json.data.user);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingDate\": \"{{BOOKING_DATE_1}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/coworkingspaces/{{SPACE_ID}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces", "{{SPACE_ID}}", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "4.2 Create Booking #2 — Success",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var d = new Date();",
+                  "d.setDate(d.getDate() + 2);",
+                  "pm.environment.set('BOOKING_DATE_2', d.toISOString().split('T')[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 4.2 Booking #2 — Status 201 Created', function () {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "});",
+                  "",
+                  "pm.test('✅ 4.2 Booking #2 — success true', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.environment.set('BOOKING_ID_2', json.data._id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingDate\": \"{{BOOKING_DATE_2}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/coworkingspaces/{{SPACE_ID}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces", "{{SPACE_ID}}", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "4.3 Create Booking #3 — Success",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var d = new Date();",
+                  "d.setDate(d.getDate() + 3);",
+                  "pm.environment.set('BOOKING_DATE_3', d.toISOString().split('T')[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 4.3 Booking #3 — Status 201 Created', function () {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "});",
+                  "",
+                  "pm.test('✅ 4.3 Booking #3 — success true (ครบ 3 แล้ว)', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.environment.set('BOOKING_ID_3', json.data._id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingDate\": \"{{BOOKING_DATE_3}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/coworkingspaces/{{SPACE_ID}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces", "{{SPACE_ID}}", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "4.4 Create Booking #4 — Should FAIL (Exceed Limit)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var d = new Date();",
+                  "d.setDate(d.getDate() + 4);",
+                  "pm.environment.set('BOOKING_DATE_4', d.toISOString().split('T')[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 4.4 Booking #4 — Status 400 (Exceed 3 limit)', function () {",
+                  "    pm.expect(pm.response.code).to.eql(400);",
+                  "});",
+                  "",
+                  "pm.test('✅ 4.4 Booking #4 — success false', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(false);",
+                  "});",
+                  "",
+                  "pm.test('✅ 4.4 Booking #4 — Error message mentions 3 bookings', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.message).to.include('3');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingDate\": \"{{BOOKING_DATE_4}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/coworkingspaces/{{SPACE_ID}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces", "{{SPACE_ID}}", "bookings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. User View Own Booking",
+      "description": "👀 ขั้นตอนที่ 5 — ดู Booking ที่สร้างไว้\n\nจุดประสงค์: ทดสอบว่า User ทั่วไปเห็นเฉพาะ Booking ของตัวเอง\n\nรายละเอียด:\n- GET /bookings — ดู Booking ทั้งหมดของ user (ต้องเห็น 3 รายการ)\n- GET /bookings/:id — ดูรายละเอียด Booking เฉพาะตัว",
+      "item": [
+        {
+          "name": "5.1 Get My Bookings — See 3 bookings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 5.1 My Bookings — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 5.1 My Bookings — success true + count is 3', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.count).to.eql(3);",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "    pm.expect(json.data.length).to.eql(3);",
+                  "});",
+                  "",
+                  "pm.test('✅ 5.1 My Bookings — All bookings belong to me', function () {",
+                  "    var json = pm.response.json();",
+                  "    var userId = pm.environment.get('DEMO_USER_ID');",
+                  "    json.data.forEach(function(booking) {",
+                  "        pm.expect(booking.user).to.eql(userId);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('✅ 5.1 My Bookings — Bookings have coworkingspace populated', function () {",
+                  "    var json = pm.response.json();",
+                  "    json.data.forEach(function(booking) {",
+                  "        pm.expect(booking.coworkingspace).to.have.property('name');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["bookings"]
+            }
+          }
+        },
+        {
+          "name": "5.2 Get Single Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 5.2 Single Booking — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 5.2 Single Booking — Correct booking returned', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data._id).to.eql(pm.environment.get('BOOKING_ID_1'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings/{{BOOKING_ID_1}}",
+              "host": ["{{URL}}"],
+              "path": ["bookings", "{{BOOKING_ID_1}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. User Edit Own Booking",
+      "description": "✏️ ขั้นตอนที่ 6 — User แก้ไข Booking ของตัวเอง\n\nจุดประสงค์: ทดสอบว่า User สามารถ update Booking ที่ตัวเองสร้าง (เปลี่ยนวันที่จอง)\n\nรายละเอียด:\n- PUT /bookings/:id — เปลี่ยน bookingDate เป็นวันใหม่\n- ตรวจว่าได้ 200 OK และ bookingDate เปลี่ยนจริง",
+      "item": [
+        {
+          "name": "6.1 Update Booking — Change Date",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// วันใหม่ (อีก 10 วัน)",
+                  "var d = new Date();",
+                  "d.setDate(d.getDate() + 10);",
+                  "pm.environment.set('BOOKING_DATE_UPDATED', d.toISOString().split('T')[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 6.1 Update Booking — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 6.1 Update Booking — success true + date changed', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data.bookingDate).to.include(pm.environment.get('BOOKING_DATE_UPDATED'));",
+                  "});",
+                  "",
+                  "pm.test('✅ 6.1 Update Booking — Same booking ID', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data._id).to.eql(pm.environment.get('BOOKING_ID_1'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingDate\": \"{{BOOKING_DATE_UPDATED}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/bookings/{{BOOKING_ID_1}}",
+              "host": ["{{URL}}"],
+              "path": ["bookings", "{{BOOKING_ID_1}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. User Delete Own Booking",
+      "description": "🗑️ ขั้นตอนที่ 7 — User ลบ Booking ของตัวเอง\n\nจุดประสงค์: ทดสอบว่า User สามารถลบ Booking ที่ตัวเองสร้าง\n\nรายละเอียด:\n- DELETE /bookings/:id — ลบ Booking #3\n- ตรวจว่าได้ 200 OK + data เป็น {}\n- ดู bookings อีกครั้ง ต้องเหลือ 2 รายการ",
+      "item": [
+        {
+          "name": "7.1 Delete Booking #3",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 7.1 Delete Booking — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 7.1 Delete Booking — success true + data empty', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data).to.eql({});",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings/{{BOOKING_ID_3}}",
+              "host": ["{{URL}}"],
+              "path": ["bookings", "{{BOOKING_ID_3}}"]
+            }
+          }
+        },
+        {
+          "name": "7.2 Verify — Bookings now 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 7.2 After Delete — count is 2', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.count).to.eql(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["bookings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. User Log-out",
+      "description": "🚪 ขั้นตอนที่ 8 — User ออกจากระบบ\n\nจุดประสงค์: ทดสอบว่า logout ล้าง JWT cookie และหลัง logout เข้า protected route ไม่ได้\n\nรายละเอียด:\n- GET /auth/logout — ออกจากระบบ\n- ตรวจว่า Set-Cookie ตั้ง token=none\n- ลองเข้า /auth/me ต้องได้ 401",
+      "item": [
+        {
+          "name": "8.1 Logout User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 8.1 Logout — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 8.1 Logout — success true + data empty', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data).to.eql({});",
+                  "});",
+                  "",
+                  "pm.test('✅ 8.1 Logout — Cookie cleared (token=none)', function () {",
+                  "    var cookies = pm.response.headers.get('Set-Cookie');",
+                  "    pm.expect(cookies).to.include('token=none');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{USER_TOKEN}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/auth/logout",
+              "host": ["{{URL}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Admin Log-in",
+      "description": "👑 ขั้นตอนที่ 9 — Admin Login\n\nจุดประสงค์: ทดสอบว่า Admin สามารถลงทะเบียนและ login เข้าสู่ระบบได้\n\nรายละเอียด:\n- Register admin ใหม่ (role: admin)\n- Login ด้วย admin credentials\n- เก็บ ADMIN_TOKEN สำหรับ request ถัดไป",
+      "item": [
+        {
+          "name": "9.1 Register Admin",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var ts = Date.now();",
+                  "pm.environment.set('ADMIN_EMAIL', 'demo_admin_' + ts + '@example.com');",
+                  "pm.environment.set('ADMIN_NAME', 'DemoAdmin' + ts);",
+                  "pm.environment.set('ADMIN_PASSWORD', 'admin123456');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 9.1 Register Admin — Status 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('✅ 9.1 Register Admin — success true + token', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{ADMIN_NAME}}\",\n  \"tel\": \"0899999999\",\n  \"email\": \"{{ADMIN_EMAIL}}\",\n  \"password\": \"{{ADMIN_PASSWORD}}\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/register",
+              "host": ["{{URL}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "9.2 Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 9.2 Admin Login — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 9.2 Admin Login — success true + token', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    pm.environment.set('ADMIN_TOKEN', json.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ADMIN_EMAIL}}\",\n  \"password\": \"{{ADMIN_PASSWORD}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/login",
+              "host": ["{{URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Admin View Any Booking",
+      "description": "👁️ ขั้นตอนที่ 10 — Admin ดู Booking ทั้งหมด\n\nจุดประสงค์: ทดสอบว่า Admin เห็น Booking ของทุก user (ต่างจาก user ทั่วไปที่เห็นแค่ของตัวเอง)\n\nรายละเอียด:\n- GET /bookings — Admin ดูทั้งหมด\n- ตรวจว่าเห็น Booking ของ Demo User ที่สร้างไว้ (2 รายการ)\n- ตรวจว่ามี user info populated (name, email)",
+      "item": [
+        {
+          "name": "10.1 Admin Get All Bookings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 10.1 Admin Bookings — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 10.1 Admin Bookings — success true + data is array', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "    pm.expect(json.count).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('✅ 10.1 Admin Bookings — Can see user info (populated)', function () {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data.length > 0 && json.data[0].user) {",
+                  "        pm.expect(json.data[0].user).to.have.property('name');",
+                  "        pm.expect(json.data[0].user).to.have.property('email');",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('✅ 10.1 Admin Bookings — Can see coworkingspace info', function () {",
+                  "    var json = pm.response.json();",
+                  "    if (json.data.length > 0) {",
+                  "        pm.expect(json.data[0].coworkingspace).to.have.property('name');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{ADMIN_TOKEN}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["bookings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Admin Edit Any Booking",
+      "description": "✏️ ขั้นตอนที่ 11 — Admin แก้ไข Booking ของ User คนอื่น\n\nจุดประสงค์: ทดสอบว่า Admin มีสิทธิ์แก้ไข Booking ของ user คนอื่นได้ (ต่างจาก user ทั่วไปที่แก้ได้เฉพาะของตัวเอง)\n\nรายละเอียด:\n- PUT /bookings/:id — ใช้ ADMIN_TOKEN แก้ไข Booking #1 ของ Demo User\n- ตรวจว่าได้ 200 OK (ไม่ใช่ 401 Unauthorized)",
+      "item": [
+        {
+          "name": "11.1 Admin Update User's Booking",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "var d = new Date();",
+                  "d.setDate(d.getDate() + 20);",
+                  "pm.environment.set('ADMIN_UPDATE_DATE', d.toISOString().split('T')[0]);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 11.1 Admin Update — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 11.1 Admin Update — success true + date changed', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data.bookingDate).to.include(pm.environment.get('ADMIN_UPDATE_DATE'));",
+                  "});",
+                  "",
+                  "pm.test('✅ 11.1 Admin Update — Can edit other user booking', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data._id).to.eql(pm.environment.get('BOOKING_ID_1'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{ADMIN_TOKEN}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingDate\": \"{{ADMIN_UPDATE_DATE}}\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/bookings/{{BOOKING_ID_1}}",
+              "host": ["{{URL}}"],
+              "path": ["bookings", "{{BOOKING_ID_1}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Admin Delete Any Booking",
+      "description": "🗑️ ขั้นตอนที่ 12 — Admin ลบ Booking ของ User คนอื่น + Cleanup\n\nจุดประสงค์: ทดสอบว่า Admin สามารถลบ Booking ของ user คนอื่นได้\n\nรายละเอียด:\n- DELETE /bookings/:id — ใช้ ADMIN_TOKEN ลบ Booking #1 ของ Demo User\n- DELETE /bookings/:id — ลบ Booking #2 ด้วย (Cleanup)\n- ตรวจว่าได้ 200 OK ทั้งคู่",
+      "item": [
+        {
+          "name": "12.1 Admin Delete Booking #1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 12.1 Admin Delete #1 — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 12.1 Admin Delete #1 — success true + data empty', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data).to.eql({});",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{ADMIN_TOKEN}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings/{{BOOKING_ID_1}}",
+              "host": ["{{URL}}"],
+              "path": ["bookings", "{{BOOKING_ID_1}}"]
+            }
+          }
+        },
+        {
+          "name": "12.2 Admin Delete Booking #2 (Cleanup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 12.2 Admin Delete #2 — Status 200', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ 12.2 Admin Delete #2 — success true', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{ADMIN_TOKEN}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings/{{BOOKING_ID_2}}",
+              "host": ["{{URL}}"],
+              "path": ["bookings", "{{BOOKING_ID_2}}"]
+            }
+          }
+        },
+        {
+          "name": "12.3 Verify — No bookings left",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 12.3 Cleanup — All bookings deleted (count 0 or no demo user bookings)', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    // Admin sees all bookings — demo user bookings should be gone",
+                  "    var demoUserId = pm.environment.get('DEMO_USER_ID');",
+                  "    var demoBookings = json.data.filter(function(b) {",
+                  "        return (b.user && (b.user === demoUserId || (b.user._id && b.user._id === demoUserId)));",
+                  "    });",
+                  "    pm.expect(demoBookings.length).to.eql(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{ADMIN_TOKEN}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/bookings",
+              "host": ["{{URL}}"],
+              "path": ["bookings"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": { "type": "text/javascript", "exec": [""] }
+    },
+    {
+      "listen": "test",
+      "script": { "type": "text/javascript", "exec": [""] }
+    }
+  ]
+}

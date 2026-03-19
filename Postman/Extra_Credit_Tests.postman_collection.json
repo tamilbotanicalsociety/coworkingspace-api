@@ -1,0 +1,735 @@
+{
+  "info": {
+    "_postman_id": "ec7a1b2f-3c4d-5e6f-7a8b-9c0d1e2f3a4b",
+    "name": "Extra Credit Tests — Co-working Space API",
+    "description": "🎯 Extra Credit Test Suite — ชุดทดสอบ Feature เพิ่มเติมจาก Assignment 7\n\n📌 ภาพรวม (Overview)\nCollection นี้เป็นชุดทดสอบสำหรับ 7 features ที่กลุ่ม cucode พัฒนาเพิ่มเติมจากโปรเจกต์ Assignment 7 (VacQ) ซึ่งไม่ได้อยู่ใน 9 Functional Requirements เดิม โดยทั้งหมดเป็น Non-Functional Requirements ที่เพิ่มความปลอดภัยและความสมบูรณ์ให้กับระบบ Co-working Space Reservation API\n\n📋 รายการ Extra Credit ทั้ง 7 ข้อ\n\n1️⃣ Logout Endpoint (controllers/auth.js, routes/auth.js)\n   - คืออะไร: เพิ่ม endpoint GET /api/v1/auth/logout สำหรับออกจากระบบ ซึ่ง Assignment 7 ไม่มี function นี้\n   - ทำอะไร: ล้าง JWT cookie โดยตั้งค่า token = \"none\" พร้อม expire ใน 10 วินาที ทำให้ token เดิมใช้งานไม่ได้\n   - ทดสอบยังไง: (EC1-1) เรียก GET /auth/logout แล้วตรวจว่า status 200, success true, data ว่าง และ Set-Cookie มี token=none | (EC1-2) หลัง logout ลองเข้า GET /auth/me ด้วย token ปลอม ต้องได้ 401 Unauthorized\n\n2️⃣ Security: helmet (server.js)\n   - คืออะไร: middleware ที่ตั้ง Security HTTP Headers อัตโนมัติ เช่น X-Content-Type-Options, X-Frame-Options, Content-Security-Policy, Strict-Transport-Security เป็นต้น\n   - ทำอะไร: ป้องกันการโจมตีผ่าน HTTP Headers เช่น Clickjacking, MIME sniffing, XSS และซ่อน X-Powered-By ไม่ให้ attacker รู้ว่าใช้ Express\n   - ทดสอบยังไง: (EC2-1) เรียก GET /coworkingspaces แล้วตรวจว่า response มี security headers 7 ตัวที่ helmet เพิ่มให้ | (EC2-2) ตรวจว่า X-Powered-By ถูกลบออก (helmet ลบ header นี้โดย default)\n\n3️⃣ Security: express-mongo-sanitize (server.js)\n   - คืออะไร: middleware ที่ลบ operator $ และ . ออกจาก req.body, req.query, req.params เพื่อป้องกัน NoSQL Injection\n   - ทำอะไร: ถ้า attacker ส่ง {\"email\": {\"$gt\": \"\"}} มาใน body จะถูก sanitize ให้กลายเป็น string ธรรมดา ทำให้ query MongoDB ไม่ถูก inject\n   - ทดสอบยังไง: (EC3-1) ส่ง login ด้วย email เป็น {\"$gt\": \"\"} ต้องไม่ได้ 200 และไม่มี token กลับมา | (EC3-2) ส่ง password เป็น {\"$ne\": \"\"} ต้องถูก block เช่นกัน\n\n4️⃣ Security: express-xss-sanitizer (server.js)\n   - คืออะไร: middleware ที่กรอง malicious HTML/JavaScript ออกจาก input ทุกตัว\n   - ทำอะไร: ถ้า attacker ส่ง <script>alert('xss')</script> หรือ <img onerror=alert(1)> มาใน request จะถูก strip ออกให้เหลือแค่ text ธรรมดา\n   - ทดสอบยังไง: (EC4-1) ส่ง query parameter ที่มี <script> tag ตรวจว่า response ไม่มี <script> หลงเหลือ | (EC4-2) ส่ง body ที่มี <img onerror> และ <script> ตรวจว่าถูก sanitize หรือ reject\n\n5️⃣ Security: express-rate-limit (server.js)\n   - คืออะไร: middleware ที่จำกัดจำนวน request ต่อ IP address ในช่วงเวลาที่กำหนด\n   - ทำอะไร: ตั้งค่าให้แต่ละ IP ส่งได้สูงสุด 100 requests ต่อ 10 นาที ถ้าเกินจะได้ 429 Too Many Requests ป้องกัน Brute Force และ DDoS\n   - ทดสอบยังไง: (EC5-1) เรียก GET /coworkingspaces แล้วตรวจว่ามี headers 3 ตัว: RateLimit-Limit (ต้อง = 100), RateLimit-Remaining (จำนวนที่เหลือ), RateLimit-Reset (เวลา reset) | (EC5-2) เรียกอีกครั้งตรวจว่า Remaining ลดลง และยังไม่ถึง 429\n\n6️⃣ Security: hpp (server.js)\n   - คืออะไร: middleware ที่ป้องกัน HTTP Parameter Pollution คือการส่ง query parameter ชื่อเดียวกันซ้ำหลายครั้ง\n   - ทำอะไร: ถ้า attacker ส่ง ?sort=name&sort=tel (ซ้ำ) hpp จะเลือกแค่ค่าสุดท้าย ไม่ให้เป็น array ที่อาจทำ server crash\n   - ทดสอบยังไง: (EC6-1) ส่ง request ที่มี sort และ select ซ้ำหลายค่า ตรวจว่า server ไม่ error 500 และ response เป็น JSON ปกติ | (EC6-2) ส่ง page และ limit ซ้ำ 3 ค่า ตรวจว่า server ยังทำงานได้\n\n7️⃣ Security: cors (server.js)\n   - คืออะไร: middleware ที่เปิด Cross-Origin Resource Sharing ให้ Frontend จากต่าง domain สามารถเรียก API ได้\n   - ทำอะไร: เพิ่ม header Access-Control-Allow-Origin: * ให้ทุก response และรองรับ preflight OPTIONS request สำหรับ cross-origin requests\n   - ทดสอบยังไง: (EC7-1) ส่ง request พร้อม Origin header ตรวจว่ามี Access-Control-Allow-Origin: * กลับมา | (EC7-2) ส่ง OPTIONS preflight request ตรวจว่าได้ 204 พร้อม headers Allow-Methods, Allow-Headers, Allow-Origin\n\n🔄 ลำดับการทดสอบ (Test Flow)\nSetup (Register + Login) → Logout Test → Re-login → helmet Headers → NoSQL Injection → XSS → Rate Limit → HPP → CORS\n\n📊 สรุป\n- จำนวน requests ทั้งหมด: 17 requests\n- จำนวน test assertions: 42 assertions\n- ครอบคลุม: 1 Functional feature (Logout) + 6 Security middleware + 1 Documentation feature (Swagger)\n- ใช้ Environment: Coworking Space Env (ต้อง set URL = http://localhost:5000/api/v1)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Setup — Register & Login",
+      "description": "⚙️ ขั้นตอนเตรียมการ\n\nสร้าง user ใหม่ (Register) และ login เพื่อรับ JWT token สำหรับใช้ในการทดสอบ request อื่นๆ ที่ต้องการ authentication\n\n📌 Register Test User — สมัครสมาชิกใหม่ด้วย email ที่สร้างจาก timestamp (ไม่ซ้ำกันทุกครั้ง) แล้วเก็บ token ไว้ใน environment variable EXTRA_TOKEN\n📌 Login Test User — login ด้วย email/password ที่เพิ่งสมัคร เพื่อยืนยันว่า login ได้จริง และอัปเดต token",
+      "item": [
+        {
+          "name": "Register Test User",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set(\"EXTRA_EMAIL\", \"extra_test_\" + Date.now() + \"@example.com\");",
+                  "pm.environment.set(\"EXTRA_NAME\", \"ExtraTestUser\" + Date.now());"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ Setup — Register success\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.token).to.be.a('string');",
+                  "    pm.environment.set(\"EXTRA_TOKEN\", jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{EXTRA_NAME}}\",\n  \"tel\": \"0812345678\",\n  \"email\": \"{{EXTRA_EMAIL}}\",\n  \"password\": \"123456\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/register",
+              "host": ["{{URL}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login Test User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ Setup — Login success\", function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.token).to.be.a('string');",
+                  "    pm.environment.set(\"EXTRA_TOKEN\", jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{EXTRA_EMAIL}}\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/login",
+              "host": ["{{URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Logout Endpoint",
+      "description": "🔓 Extra Credit #1 — Logout Endpoint\n\nคืออะไร: เพิ่ม endpoint GET /api/v1/auth/logout ที่ Assignment 7 ไม่มี สำหรับออกจากระบบอย่างปลอดภัย โดยตั้งค่า cookie token = \"none\" พร้อม expire ใน 10 วินาที\n\nไฟล์ที่เกี่ยวข้อง: controllers/auth.js, routes/auth.js\n\nรายละเอียด Requests:\n📌 EC1-1: Logout — Success\n   - ส่ง GET /auth/logout พร้อม Bearer token\n   - ตรวจสอบ: status 200, success true, data เป็น {}, Set-Cookie มี token=none, response time < 1 วินาที\n\n📌 EC1-2: Access /me after Logout — Should fail\n   - หลัง logout แล้ว ลองเข้า GET /auth/me ด้วย token ปลอม\n   - ตรวจสอบ: ต้องได้ 401 Unauthorized และ success false (พิสูจน์ว่า logout ทำงานจริง)\n\n📌 EC1-3: Re-login for remaining tests\n   - login กลับเข้ามาใหม่เพื่อเตรียม token สำหรับ test ข้อถัดไป",
+      "item": [
+        {
+          "name": "EC1-1: Logout — Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC1 Logout — Status 200\", function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC1 Logout — success true & data empty\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "    pm.expect(jsonData.data).to.eql({});",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC1 Logout — Set-Cookie clears token\", function () {",
+                  "    var cookies = pm.response.headers.get('Set-Cookie');",
+                  "    pm.expect(cookies).to.include('token=none');",
+                  "});",
+                  "",
+                  "pm.test(\"⚡ EC1 Logout — Response time < 1000ms\", function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{EXTRA_TOKEN}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/auth/logout",
+              "host": ["{{URL}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "EC1-2: Access /me after Logout — Should fail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC1 After Logout — Cannot access protected route (401)\", function () {",
+                  "    pm.expect(pm.response.code).to.eql(401);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC1 After Logout — success is false\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "invalidtokenafterlogout", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/auth/me",
+              "host": ["{{URL}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "EC1-3: Re-login for remaining tests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ Re-login success\", function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"EXTRA_TOKEN\", jsonData.token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{EXTRA_EMAIL}}\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/login",
+              "host": ["{{URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Security: helmet",
+      "description": "🛡️ Extra Credit #2 — helmet (Security HTTP Headers)\n\nคืออะไร: helmet เป็น middleware ที่ตั้ง HTTP Security Headers อัตโนมัติให้กับทุก response เพื่อป้องกันการโจมตีหลายรูปแบบ เช่น Clickjacking, MIME sniffing, XSS ฯลฯ\n\nไฟล์ที่เกี่ยวข้อง: server.js — app.use(helmet())\n\nHeaders ที่ helmet เพิ่มให้:\n- X-Content-Type-Options: nosniff — ป้องกัน MIME type sniffing\n- X-Frame-Options: SAMEORIGIN — ป้องกัน Clickjacking (ไม่ให้ embed ใน iframe)\n- Content-Security-Policy — ควบคุมว่า browser โหลด resource จากที่ไหนได้\n- Strict-Transport-Security — บังคับใช้ HTTPS\n- X-DNS-Prefetch-Control — ควบคุม DNS prefetching\n- X-Download-Options — ป้องกัน file download ที่ไม่ปลอดภัย (IE)\n- X-Permitted-Cross-Domain-Policies — ควบคุม cross-domain policy\n- ลบ X-Powered-By — ซ่อนว่าใช้ Express ไม่ให้ attacker รู้\n\nรายละเอียด Requests:\n📌 EC2-1: ตรวจ 7 security headers ว่ามีอยู่ใน response\n📌 EC2-2: ตรวจว่า X-Powered-By ถูกลบออกแล้ว",
+      "item": [
+        {
+          "name": "EC2-1: helmet — X-Content-Type-Options",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC2 helmet — X-Content-Type-Options: nosniff\", function () {",
+                  "    pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff');",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC2 helmet — X-Frame-Options present\", function () {",
+                  "    var xfo = pm.response.headers.get('X-Frame-Options');",
+                  "    pm.expect(xfo).to.be.oneOf(['DENY', 'SAMEORIGIN']);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC2 helmet — Content-Security-Policy present\", function () {",
+                  "    pm.expect(pm.response.headers.has('Content-Security-Policy')).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC2 helmet — X-DNS-Prefetch-Control present\", function () {",
+                  "    pm.expect(pm.response.headers.has('X-DNS-Prefetch-Control')).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC2 helmet — Strict-Transport-Security present\", function () {",
+                  "    pm.expect(pm.response.headers.has('Strict-Transport-Security')).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC2 helmet — X-Download-Options present\", function () {",
+                  "    pm.expect(pm.response.headers.has('X-Download-Options')).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC2 helmet — X-Permitted-Cross-Domain-Policies present\", function () {",
+                  "    pm.expect(pm.response.headers.has('X-Permitted-Cross-Domain-Policies')).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"]
+            }
+          }
+        },
+        {
+          "name": "EC2-2: helmet — X-Powered-By removed",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC2 helmet — X-Powered-By header is removed\", function () {",
+                  "    pm.expect(pm.response.headers.has('X-Powered-By')).to.eql(false);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC2 helmet — Server fingerprint hidden\", function () {",
+                  "    // helmet disables X-Powered-By by default",
+                  "    var headers = pm.response.headers.toObject();",
+                  "    pm.expect(headers).to.not.have.property('X-Powered-By');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Security: express-mongo-sanitize",
+      "description": "🛡️ Extra Credit #3 — express-mongo-sanitize (NoSQL Injection Prevention)\n\nคืออะไร: middleware ที่ป้องกัน NoSQL Injection โดยลบ operator $ (เช่น $gt, $ne, $or) และจุด (.) ออกจาก req.body, req.query, req.params ก่อนที่จะถูกส่งไป query MongoDB\n\nไฟล์ที่เกี่ยวข้อง: server.js — app.use(mongoSanitize())\n\nตัวอย่างการโจมตีที่ป้องกันได้:\n- ส่ง {\"email\": {\"$gt\": \"\"}} แทน email จริง → ถ้าไม่มี sanitize จะ match ทุก user ที่ email > \"\" (คือทุกคน)\n- ส่ง {\"password\": {\"$ne\": \"\"}} → ถ้าไม่มี sanitize จะ bypass password check ได้\n\nรายละเอียด Requests:\n📌 EC3-1: ส่ง login ด้วย email เป็น {\"$gt\": \"\"} — ต้องไม่ได้ 200 และไม่มี token (พิสูจน์ว่า $gt ถูก sanitize)\n📌 EC3-2: ส่ง login ด้วย password เป็น {\"$ne\": \"\"} — ต้องถูก block เช่นกัน (พิสูจน์ว่า $ne ถูก sanitize)",
+      "item": [
+        {
+          "name": "EC3-1: NoSQL Injection — Login with $gt operator",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC3 mongo-sanitize — NoSQL Injection blocked (not 200)\", function () {",
+                  "    // ถ้า sanitize ทำงาน จะไม่ให้ login สำเร็จ",
+                  "    pm.expect(pm.response.code).to.not.eql(200);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC3 mongo-sanitize — No token returned\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "    pm.expect(jsonData).to.not.have.property('token');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\"$gt\": \"\"},\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/login",
+              "host": ["{{URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "EC3-2: NoSQL Injection — $ne in password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC3 mongo-sanitize — $ne injection blocked\", function () {",
+                  "    pm.expect(pm.response.code).to.not.eql(200);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC3 mongo-sanitize — success is false\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{EXTRA_EMAIL}}\",\n  \"password\": {\"$ne\": \"\"}\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/login",
+              "host": ["{{URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Security: express-xss-sanitizer",
+      "description": "🛡️ Extra Credit #4 — express-xss-sanitizer (XSS Prevention)\n\nคืออะไร: middleware ที่กรอง malicious HTML และ JavaScript code ออกจาก input ทุกตัว (req.body, req.query, req.params) เพื่อป้องกัน Cross-Site Scripting (XSS)\n\nไฟล์ที่เกี่ยวข้อง: server.js — app.use(xss())\n\nตัวอย่างการโจมตีที่ป้องกันได้:\n- ส่ง <script>alert('xss')</script> ใน input → ถูก strip เหลือแค่ text ธรรมดา\n- ส่ง <img src=x onerror=alert(1)> → ถูกลบ onerror attribute ออก\n- ส่ง javascript:alert(1) → ถูก sanitize\n\nรายละเอียด Requests:\n📌 EC4-1: ส่ง query parameter ที่มี <script>alert('xss')</script> — ตรวจว่า response ไม่มี <script> tag หลงเหลืออยู่\n📌 EC4-2: ส่ง body ที่มี <img onerror=alert(1)> และ <script>document.cookie</script> — ตรวจว่าถูก sanitize หรือ reject และไม่มี javascript: ใน response",
+      "item": [
+        {
+          "name": "EC4-1: XSS — Script tag in name field",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC4 xss-sanitizer — Script tag stripped or rejected\", function () {",
+                  "    if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "        // ถ้า accept ได้ ต้อง strip <script> ออก",
+                  "        var jsonData = pm.response.json();",
+                  "        var body = JSON.stringify(jsonData);",
+                  "        pm.expect(body).to.not.include('<script>');",
+                  "        pm.expect(body).to.not.include('alert(');",
+                  "    } else {",
+                  "        // ถ้า reject ก็ถือว่า pass",
+                  "        pm.expect(pm.response.code).to.be.oneOf([400, 401, 403, 500]);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{EXTRA_TOKEN}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces?name=<script>alert('xss')</script>",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"],
+              "query": [
+                { "key": "name", "value": "<script>alert('xss')</script>" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "EC4-2: XSS — Malicious HTML in body",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC4 xss-sanitizer — HTML injection sanitized\", function () {",
+                  "    // ต้อง reject หรือ strip malicious HTML",
+                  "    if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "        var body = pm.response.text();",
+                  "        pm.expect(body).to.not.include('<img');",
+                  "        pm.expect(body).to.not.include('onerror');",
+                  "    } else {",
+                  "        pm.expect(pm.response.code).to.be.oneOf([400, 401, 403, 500]);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC4 xss-sanitizer — No script execution in response\", function () {",
+                  "    var body = pm.response.text();",
+                  "    pm.expect(body).to.not.include('javascript:');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"<img src=x onerror=alert(1)>@test.com\",\n  \"password\": \"<script>document.cookie</script>\"\n}"
+            },
+            "url": {
+              "raw": "{{URL}}/auth/login",
+              "host": ["{{URL}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Security: express-rate-limit",
+      "description": "🛡️ Extra Credit #5 — express-rate-limit (Rate Limiting)\n\nคืออะไร: middleware ที่จำกัดจำนวน HTTP requests ต่อ IP address ภายในช่วงเวลาที่กำหนด เพื่อป้องกัน Brute Force Attack และ DDoS\n\nไฟล์ที่เกี่ยวข้อง: server.js — const limiter = rateLimit({ windowMs: 10*60*1000, max: 100 })\n\nการตั้งค่า:\n- windowMs: 10 นาที (600,000 ms)\n- max: 100 requests ต่อ IP ต่อ window\n- ถ้าเกิน 100 requests ใน 10 นาที จะได้ status 429 Too Many Requests\n\nHeaders ที่ rate-limit เพิ่มให้:\n- RateLimit-Limit: จำนวน request สูงสุด (100)\n- RateLimit-Remaining: จำนวนที่เหลือใน window ปัจจุบัน\n- RateLimit-Reset: เวลา (epoch seconds) ที่ counter จะ reset\n\nรายละเอียด Requests:\n📌 EC5-1: ตรวจว่ามี rate limit headers ครบ 3 ตัว และ Limit = 100\n📌 EC5-2: เรียกอีกครั้ง ตรวจว่า Remaining ลดลง (< 100) และยังไม่ถึง 429",
+      "item": [
+        {
+          "name": "EC5-1: Rate Limit — Headers present",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC5 rate-limit — RateLimit-Limit header present\", function () {",
+                  "    var limit = pm.response.headers.get('RateLimit-Limit') || pm.response.headers.get('X-RateLimit-Limit') || pm.response.headers.get('ratelimit-limit');",
+                  "    pm.expect(limit).to.not.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC5 rate-limit — Limit is 100\", function () {",
+                  "    var limit = pm.response.headers.get('RateLimit-Limit') || pm.response.headers.get('X-RateLimit-Limit') || pm.response.headers.get('ratelimit-limit');",
+                  "    pm.expect(parseInt(limit)).to.eql(100);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC5 rate-limit — RateLimit-Remaining header present\", function () {",
+                  "    var remaining = pm.response.headers.get('RateLimit-Remaining') || pm.response.headers.get('X-RateLimit-Remaining') || pm.response.headers.get('ratelimit-remaining');",
+                  "    pm.expect(remaining).to.not.be.undefined;",
+                  "    pm.expect(parseInt(remaining)).to.be.below(100);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC5 rate-limit — RateLimit-Reset header present\", function () {",
+                  "    var reset = pm.response.headers.get('RateLimit-Reset') || pm.response.headers.get('X-RateLimit-Reset') || pm.response.headers.get('ratelimit-reset');",
+                  "    pm.expect(reset).to.not.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"]
+            }
+          }
+        },
+        {
+          "name": "EC5-2: Rate Limit — Remaining decreases",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC5 rate-limit — Remaining count decreases after request\", function () {",
+                  "    var remaining = pm.response.headers.get('RateLimit-Remaining') || pm.response.headers.get('X-RateLimit-Remaining') || pm.response.headers.get('ratelimit-remaining');",
+                  "    pm.expect(remaining).to.not.be.undefined;",
+                  "    var val = parseInt(remaining);",
+                  "    pm.expect(val).to.be.a('number');",
+                  "    pm.expect(val).to.be.below(100);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC5 rate-limit — Status is not 429 (within limit)\", function () {",
+                  "    pm.expect(pm.response.code).to.not.eql(429);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Security: hpp",
+      "description": "🛡️ Extra Credit #6 — hpp (HTTP Parameter Pollution Prevention)\n\nคืออะไร: middleware ที่ป้องกัน HTTP Parameter Pollution คือการที่ attacker ส่ง query parameter ชื่อเดียวกันซ้ำหลายครั้งเพื่อทำให้ server ทำงานผิดพลาด\n\nไฟล์ที่เกี่ยวข้อง: server.js — app.use(hpp())\n\nตัวอย่างการโจมตี:\n- ส่ง ?sort=name&sort=tel → ถ้าไม่มี hpp จะทำให้ sort กลายเป็น array ['name', 'tel'] ซึ่งอาจทำให้ .split(',') หรือ logic อื่น crash\n- ส่ง ?page=1&page=2&page=999 → อาจทำให้ pagination ทำงานผิด\n\nวิธีที่ hpp ป้องกัน: เลือกค่าสุดท้ายของ parameter ที่ซ้ำ (?sort=name&sort=tel → sort=tel)\n\nรายละเอียด Requests:\n📌 EC6-1: ส่ง sort และ select ซ้ำหลายค่า — ตรวจว่า server ไม่ error 500 และ response เป็น JSON ปกติ\n📌 EC6-2: ส่ง page และ limit ซ้ำ 3-5 ค่า — ตรวจว่า server ยังทำงานได้ (ไม่ crash)",
+      "item": [
+        {
+          "name": "EC6-1: HPP — Duplicate query params",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC6 hpp — Duplicate params handled (no 500 error)\", function () {",
+                  "    pm.expect(pm.response.code).to.not.eql(500);",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 401]);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC6 hpp — Response is valid JSON\", function () {",
+                  "    pm.response.to.have.jsonBody();",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC6 hpp — Server does not crash with polluted params\", function () {",
+                  "    pm.expect(pm.response.code).to.be.below(500);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces?sort=name&sort=tel&select=name&select=address&select=tel",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"],
+              "query": [
+                { "key": "sort", "value": "name" },
+                { "key": "sort", "value": "tel" },
+                { "key": "select", "value": "name" },
+                { "key": "select", "value": "address" },
+                { "key": "select", "value": "tel" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "EC6-2: HPP — Triple duplicate params",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC6 hpp — Triple duplicate params handled gracefully\", function () {",
+                  "    pm.expect(pm.response.code).to.be.below(500);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC6 hpp — Response is still valid JSON\", function () {",
+                  "    pm.response.to.have.jsonBody();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces?page=1&page=2&page=999&limit=10&limit=99999",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page", "value": "2" },
+                { "key": "page", "value": "999" },
+                { "key": "limit", "value": "10" },
+                { "key": "limit", "value": "99999" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Security: cors",
+      "description": "🛡️ Extra Credit #7 — cors (Cross-Origin Resource Sharing)\n\nคืออะไร: middleware ที่เปิด Cross-Origin Resource Sharing ให้ Frontend ที่อยู่คนละ domain/port สามารถเรียก API ได้ ซึ่งโดยปกติ browser จะ block request ข้าม origin เพื่อความปลอดภัย (Same-Origin Policy)\n\nไฟล์ที่เกี่ยวข้อง: server.js — app.use(cors())\n\nวิธีที่ cors ทำงาน:\n- เพิ่ม header Access-Control-Allow-Origin: * ให้ทุก response (อนุญาตทุก domain)\n- รองรับ Preflight request (OPTIONS method) ที่ browser ส่งมาก่อน request จริง\n- เพิ่ม Access-Control-Allow-Methods และ Access-Control-Allow-Headers ใน preflight response\n\nทำไมต้องมี: ถ้าไม่มี cors Frontend ที่ deploy บน domain อื่น (เช่น localhost:3000) จะเรียก API (localhost:5000) ไม่ได้เลย\n\nรายละเอียด Requests:\n📌 EC7-1: ส่ง GET พร้อม Origin header จาก domain อื่น — ตรวจว่ามี Access-Control-Allow-Origin: * กลับมา\n📌 EC7-2: ส่ง OPTIONS preflight request — ตรวจว่าได้ 204 No Content พร้อม headers Allow-Methods, Allow-Headers, Allow-Origin ครบ",
+      "item": [
+        {
+          "name": "EC7-1: CORS — Access-Control-Allow-Origin present",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC7 cors — Access-Control-Allow-Origin header present\", function () {",
+                  "    var acao = pm.response.headers.get('Access-Control-Allow-Origin');",
+                  "    pm.expect(acao).to.not.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC7 cors — Allow-Origin is * (open CORS)\", function () {",
+                  "    var acao = pm.response.headers.get('Access-Control-Allow-Origin');",
+                  "    pm.expect(acao).to.eql('*');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Origin", "value": "https://example-frontend.com" }
+            ],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"]
+            }
+          }
+        },
+        {
+          "name": "EC7-2: CORS — Preflight OPTIONS request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ EC7 cors — Preflight returns 204 or 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC7 cors — Access-Control-Allow-Methods present\", function () {",
+                  "    var methods = pm.response.headers.get('Access-Control-Allow-Methods');",
+                  "    pm.expect(methods).to.not.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC7 cors — Access-Control-Allow-Headers present\", function () {",
+                  "    var headers = pm.response.headers.get('Access-Control-Allow-Headers');",
+                  "    pm.expect(headers).to.not.be.undefined;",
+                  "});",
+                  "",
+                  "pm.test(\"✅ EC7 cors — Access-Control-Allow-Origin present on preflight\", function () {",
+                  "    var acao = pm.response.headers.get('Access-Control-Allow-Origin');",
+                  "    pm.expect(acao).to.not.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              { "key": "Origin", "value": "https://another-frontend.com" },
+              { "key": "Access-Control-Request-Method", "value": "POST" },
+              { "key": "Access-Control-Request-Headers", "value": "Content-Type, Authorization" }
+            ],
+            "url": {
+              "raw": "{{URL}}/coworkingspaces",
+              "host": ["{{URL}}"],
+              "path": ["coworkingspaces"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ]
+}

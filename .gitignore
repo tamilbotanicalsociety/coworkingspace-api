@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment variables (contains secrets)
+config/config.env
+
+# macOS system files
+.DS_Store
+*/.DS_Store
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+Thumbs.db
+
+# Coverage
+coverage/

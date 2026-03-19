@@ -1,0 +1,112 @@
+@startuml Coworking_Space_Class_Diagram
+
+' ========================================================
+'  Coworking Space Booking System — Class Diagram
+'  (UML Profile for Mongoose Models)
+'  Project : be-project-68-cucode
+'  Date    : March 2026
+' ========================================================
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 12
+
+skinparam class {
+    BackgroundColor #FAFAFA
+    BorderColor #424242
+    HeaderBackgroundColor #E3F2FD
+    HeaderFontColor #0D47A1
+    FontSize 12
+    AttributeFontSize 11
+    StereotypeFontSize 10
+    BorderThickness 1.5
+}
+
+skinparam arrow {
+    Color #424242
+    FontSize 10
+    Thickness 1.5
+}
+
+skinparam note {
+    BackgroundColor #FFFDE7
+    BorderColor #F9A825
+    FontSize 10
+}
+
+' ───────── Class: User ─────────
+class User <<Document>> {
+    - _id : ObjectId
+    --
+    + name : String <<required>>
+    + tel : String <<required>>
+    + email : String <<required, unique>>
+    + role : String {user | admin} = "user"
+    + password : String <<required, minlength:6, select:false>>
+    + resetPasswordToken : String
+    + resetPasswordExpire : Date
+    + createdAt : Date = Date.now
+    --
+    **Methods**
+    ..
+    + getSignedJwtToken() : String
+    + matchPassword(enteredPassword: String) : Boolean
+    --
+    **Middleware (pre-save)**
+    ..
+    # encryptPassword() : void  <<bcrypt>>
+}
+
+' ───────── Class: CoworkingSpace ─────────
+class CoworkingSpace <<Document>> {
+    - _id : ObjectId
+    --
+    + name : String <<required, unique, maxlength:50>>
+    + address : String <<required>>
+    + tel : String <<required>>
+    + OpenTime : String <<required>>
+    + CloseTime : String <<required>>
+    --
+    **Virtuals**
+    ..
+    + bookings : Booking[]  <<virtual populate>>
+    --
+    **Middleware (pre-deleteOne)**
+    ..
+    # cascadeDeleteBookings() : void
+}
+
+' ───────── Class: Booking ─────────
+class Booking <<Document>> {
+    - _id : ObjectId
+    --
+    + bookingDate : Date <<required>>
+    + user : ObjectId <<ref: User, required>>
+    + coworkingspace : ObjectId <<ref: CoworkingSpace, required>>
+    + createdAt : Date = Date.now
+}
+
+' ───────── Relationships ─────────
+User "1" -- "0..3" Booking : creates >
+note on link
+  User (role="user")
+  can have max 3 bookings
+end note
+
+CoworkingSpace "1" -- "0..*" Booking : has >
+note on link
+  Cascade delete:
+  delete space → delete
+  all its bookings
+end note
+
+' ───────── Enum ─────────
+enum UserRole <<enumeration>> {
+    user
+    admin
+}
+
+User --> UserRole : role
+
+@enduml

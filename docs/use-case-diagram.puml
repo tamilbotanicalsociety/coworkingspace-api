@@ -1,0 +1,135 @@
+@startuml Coworking_Space_Booking_System
+
+' ========================================================
+'  Coworking Space Booking System — Use Case Diagram
+'  Project : be-project-68-cucode
+'  Date    : March 2026
+' ========================================================
+
+top to bottom direction
+
+' ───────── Global Styling ─────────
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam handwritten false
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 12
+
+skinparam usecase {
+    BackgroundColor #FAFAFA
+    BorderColor #616161
+    BorderThickness 1.5
+    FontSize 11
+    FontColor #212121
+}
+
+skinparam actor {
+    FontSize 13
+    FontStyle bold
+    FontColor #212121
+}
+
+skinparam package {
+    BackgroundColor #F5F5F5
+    BorderColor #9E9E9E
+    FontSize 13
+    FontStyle bold
+    FontColor #424242
+    BorderThickness 1.5
+    style rectangle
+}
+
+skinparam rectangle {
+    BorderColor #1565C0
+    BackgroundColor #FFFFFF
+    FontSize 16
+    FontStyle bold
+    FontColor #0D47A1
+    BorderThickness 2
+}
+
+skinparam arrow {
+    Color #424242
+    FontSize 9
+    FontColor #757575
+    Thickness 1.5
+}
+
+skinparam note {
+    BackgroundColor #FFFDE7
+    BorderColor #F9A825
+    FontSize 10
+}
+
+' ───────── Actors (Left Side) ─────────
+actor "Guest" as Guest
+actor "User" as User
+actor "Admin" as Admin
+
+' ───────── Generalization ─────────
+Guest <|-- User
+User  <|-- Admin
+
+' ───────── System Boundary ─────────
+rectangle "Coworking Space Booking System" {
+
+    package "Authentication" {
+        usecase "Register" as UC1
+        usecase "Login" as UC2
+        usecase "Logout" as UC3
+        usecase "View Profile\n(Get Me)" as UC4
+    }
+
+    package "Coworking Space Management" {
+        usecase "View All\nCoworking Spaces" as UC5
+        usecase "View Coworking\nSpace Detail" as UC6
+        usecase "Create\nCoworking Space" as UC7
+        usecase "Update\nCoworking Space" as UC8
+        usecase "Delete\nCoworking Space" as UC9
+    }
+
+    package "Booking Management" {
+        usecase "View All\nBookings" as UC10
+        usecase "View Booking\nDetail" as UC11
+        usecase "Create Booking" as UC12
+        usecase "Update Booking" as UC13
+        usecase "Delete Booking" as UC14
+    }
+}
+
+' ───────── Guest ─────────
+Guest --> UC1
+Guest --> UC2
+Guest --> UC5
+Guest --> UC6
+
+' ───────── User ─────────
+User --> UC3
+User --> UC4
+User --> UC10 : own only
+User --> UC11
+User --> UC12
+User --> UC13 : own only
+User --> UC14 : own only
+
+' ───────── Admin ─────────
+Admin --> UC7
+Admin --> UC8
+Admin --> UC9
+Admin --> UC10 : all
+Admin --> UC13 : all
+Admin --> UC14 : all
+
+' ───────── Notes ─────────
+note right of UC12
+  User can create
+  max 3 bookings.
+  Admin: no limit.
+end note
+
+note bottom of UC2
+  JWT Bearer Token
+  (HTTP-only cookie)
+end note
+
+@enduml

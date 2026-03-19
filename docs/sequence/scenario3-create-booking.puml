@@ -1,0 +1,116 @@
+@startuml Scenario3_Create_Booking
+
+' ========================================================
+'  Scenario 3 : Create Booking (with Auth)
+'  Project : be-project-68-cucode
+'  Date    : March 2026
+' ========================================================
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 11
+
+skinparam sequence {
+    ArrowColor #37474F
+    ArrowFontSize 10
+    ArrowFontColor #546E7A
+    LifeLineBorderColor #78909C
+    LifeLineBackgroundColor #ECEFF1
+    ParticipantBorderColor #37474F
+    ParticipantBackgroundColor #E3F2FD
+    ParticipantFontColor #0D47A1
+    ParticipantFontStyle bold
+    ParticipantFontSize 12
+    ActorBorderColor #37474F
+    ActorFontStyle bold
+    GroupBorderColor #90A4AE
+    GroupHeaderFontSize 12
+    DividerBorderColor #B0BEC5
+    DividerFontSize 13
+    DividerFontStyle bold
+    BoxBorderColor #CFD8DC
+    BoxBackgroundColor #FAFAFA
+    BoxFontSize 12
+}
+
+skinparam note {
+    BackgroundColor #FFFDE7
+    BorderColor #F9A825
+    FontSize 9
+}
+
+title **Scenario 3 : Create Booking**
+
+' ───────── Participants ─────────
+actor "Client\n(Postman / Frontend)" as Client
+box "Express Server" #F5F5F5
+    participant "Router\n& Middleware" as Router
+    participant "Auth\nMiddleware" as AuthMW
+    participant "Controller" as Ctrl
+end box
+database "MongoDB\n(Atlas)" as DB
+
+' ───────── Flow ─────────
+Client -> Router : POST /api/v1/coworkingspaces/:id/bookings\nHeader: Authorization: Bearer <token>\n{bookingDate}
+activate Router
+
+Router -> AuthMW : protect(req, res, next)
+activate AuthMW
+AuthMW -> AuthMW : Extract token from\nAuthorization header
+
+alt No token or token == null
+    AuthMW --> Client : **401** "Not authorized"
+else Token exists
+    AuthMW -> AuthMW : jwt.verify(token, JWT_SECRET)
+    AuthMW -> DB : User.findById(decoded.id)
+    activate DB
+    DB --> AuthMW : user document
+    deactivate DB
+    AuthMW -> AuthMW : req.user = user
+    AuthMW -> Router : next()
+end
+deactivate AuthMW
+
+Router -> AuthMW : authorize('admin','user')
+activate AuthMW
+alt Role not in allowed list
+    AuthMW --> Client : **403** "Role not authorized"
+else Role allowed
+    AuthMW -> Router : next()
+end
+deactivate AuthMW
+
+Router -> Ctrl : addBooking(req, res)
+activate Ctrl
+
+Ctrl -> DB : CoworkingSpace.findById(coworkingspaceId)
+activate DB
+DB --> Ctrl : coworking space document
+deactivate DB
+
+alt Coworking space not found
+    Ctrl --> Router : res.status(404)
+    Router --> Client : **404 Not Found**
+else Coworking space exists
+    Ctrl -> DB : Booking.find({user: req.user.id})
+    activate DB
+    DB --> Ctrl : existedBookings[]
+    deactivate DB
+
+    alt User has >= 3 bookings && role != admin
+        Ctrl --> Router : res.status(400)\n"Already made 3 bookings"
+        Router --> Client : **400 Bad Request**
+    else Booking allowed
+        Ctrl -> DB : Booking.create({bookingDate,\nuser, coworkingspace})
+        activate DB
+        DB --> Ctrl : new booking document
+        deactivate DB
+        Ctrl --> Router : res.status(201)\n{success, data: booking}
+        Router --> Client : **201 Created**\n{success: true, data: {...}}
+    end
+end
+deactivate Ctrl
+deactivate Router
+
+@enduml

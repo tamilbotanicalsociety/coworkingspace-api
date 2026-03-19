@@ -1,0 +1,87 @@
+@startuml Scenario2_Login
+
+' ========================================================
+'  Scenario 2 : User Login
+'  Project : be-project-68-cucode
+'  Date    : March 2026
+' ========================================================
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 11
+
+skinparam sequence {
+    ArrowColor #37474F
+    ArrowFontSize 10
+    ArrowFontColor #546E7A
+    LifeLineBorderColor #78909C
+    LifeLineBackgroundColor #ECEFF1
+    ParticipantBorderColor #37474F
+    ParticipantBackgroundColor #E3F2FD
+    ParticipantFontColor #0D47A1
+    ParticipantFontStyle bold
+    ParticipantFontSize 12
+    ActorBorderColor #37474F
+    ActorFontStyle bold
+    GroupBorderColor #90A4AE
+    GroupHeaderFontSize 12
+    DividerBorderColor #B0BEC5
+    DividerFontSize 13
+    DividerFontStyle bold
+    BoxBorderColor #CFD8DC
+    BoxBackgroundColor #FAFAFA
+    BoxFontSize 12
+}
+
+skinparam note {
+    BackgroundColor #FFFDE7
+    BorderColor #F9A825
+    FontSize 9
+}
+
+title **Scenario 2 : User Login**
+
+' ───────── Participants ─────────
+actor "Client\n(Postman / Frontend)" as Client
+box "Express Server" #F5F5F5
+    participant "Router\n& Middleware" as Router
+    participant "Controller" as Ctrl
+end box
+database "MongoDB\n(Atlas)" as DB
+
+' ───────── Flow ─────────
+Client -> Router : POST /api/v1/auth/login\n{email, password}
+activate Router
+Router -> Ctrl : login(req, res)
+activate Ctrl
+
+alt Missing email or password
+    Ctrl --> Router : res.status(400)\n"Please provide email and password"
+    Router --> Client : **400 Bad Request**
+else Valid input
+    Ctrl -> DB : User.findOne({email})\n.select("+password")
+    activate DB
+    DB --> Ctrl : user document (with password)
+    deactivate DB
+
+    alt User not found
+        Ctrl --> Router : res.status(400)\n"Invalid credentials"
+        Router --> Client : **400 Bad Request**
+    else User found
+        Ctrl -> Ctrl : user.matchPassword(password)\nbcrypt.compare()
+
+        alt Password mismatch
+            Ctrl --> Router : res.status(401)\n"Invalid credentials"
+            Router --> Client : **401 Unauthorized**
+        else Password match
+            Ctrl -> Ctrl : user.getSignedJwtToken()
+            Ctrl --> Router : res.status(200)\n.cookie("token", jwt)\n.json({success, token})
+            Router --> Client : **200 OK**\n{success: true, token: "xxx"}
+        end
+    end
+end
+deactivate Ctrl
+deactivate Router
+
+@enduml
